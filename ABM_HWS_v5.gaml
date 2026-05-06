@@ -22,6 +22,7 @@ global {
 	float reward_prob						<- 1.0;			// Reward provision probability, probability of receiving the reward. 
 	bool habit_on								<- false;			// presence of habit model
 	bool str_intervention					<- false;
+	bool str_intervention_prev			<- false;
 	float str_interv_factor					<- 0.5;				// Structural intervention, like providing colored bins for waste
 	bool test_manualbehavior			<- false;			// To test several models by manually setting sorting percentage.
 	bool show_clusters					<- false;
@@ -330,7 +331,7 @@ global {
     
     }
     
-    reflex set_struct_intervention{
+    reflex set_struct_intervention when: str_intervention != str_intervention_prev{
     	
     	if str_intervention = true{
     		ask household{
@@ -345,7 +346,7 @@ global {
     		}
     	}
     		
-    	
+    	str_intervention_prev <- str_intervention;
     }
 	
 	float lag1_metric;
