@@ -340,7 +340,7 @@ global {
     	}
     	else{
     		ask household{
-    			do get_convfactors(str_interv_factor);
+    			do get_convfactors(1);
     			self.PD <- float(get_PD(PD0, conv_factors));
     		}
     	}
