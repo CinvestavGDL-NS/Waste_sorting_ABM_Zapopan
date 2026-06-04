@@ -345,7 +345,7 @@ global {
     }
 	
 	float lag1_metric;
-	int cycle_steady_state		<- 10;
+	int cycle_steady_state		<- 1000;
 	int lag1_duration		<- 100;
 	float globalcons <- 0.0;
 	reflex get_lag1 when: cycle >= cycle_steady_state and cycle < cycle_steady_state + lag1_duration and save_analysisdata{
