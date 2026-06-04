@@ -37,6 +37,7 @@ global {
 	float total_waste_collected;
 	
 	bool save_data <- false;
+	bool save_analysisdata <- false;
 	
 	//------------------------- GLOBAL VARIABLES FOR BEHAVIOR MODEL -----------------------------//
 	
@@ -239,12 +240,6 @@ global {
 		
 		population <- length(household);
 		
-		//dummy values for first local moran's I histogram.
-		generated_data <- [0.0];
-		histo_data <- distribution_of(generated_data, 100, 0, 100);
-		//dummy values for first sort frequency histogram.
-		sort_frequencies<- [0.0];
-		histo_frequencies <- distribution_of(sort_frequencies, 100, 0, 100);
 		
 		//bool delete_file_ok <-delete_file("../results/time_series.csv");
 		
@@ -341,7 +336,7 @@ global {
     	}
     	else{
     		ask household{
-    			do get_convfactors(1);
+    			do get_convfactors(1.0);
     			self.PD <- float(get_PD(PD0, conv_factors));
     		}
     	}
@@ -350,22 +345,26 @@ global {
     }
 	
 	float lag1_metric;
-	int cycle_steady_state		<- 1000;
+	int cycle_steady_state		<- 10;
 	int lag1_duration		<- 100;
-	reflex get_lag1 when: cycle >= cycle_steady_state+1000 and cycle < cycle_steady_state + lag1_duration+1000{
+	float globalcons <- 0.0;
+	reflex get_lag1 when: cycle >= cycle_steady_state and cycle < cycle_steady_state + lag1_duration and save_analysisdata{
 		lag1_metric  <- 0.0;
 		ask household{
-			lag1_metric <- lag1_metric + self.coincidence;
+			lag1_metric <- lag1_metric + self.consistency;
 		}
-		lag1_metric <- lag1_metric/population;
-		//write lag1_metric;
+		globalcons <- lag1_metric/population;
+		//globalcons <+ lag1_metric;
+		
+		save [cycle, globalcons] to: "../results/globalcons.csv" format: "csv" rewrite: false header: true;
 	}
 	
 	float P_1_given_1;
 	float P_1_given_0;
+	list<float> P1given0 <- [];
+	list<float> P1given1 <-[];
 	
-	reflex compute_transition_probs when: cycle >= cycle_steady_state+1000 and cycle < cycle_steady_state + lag1_duration +1000{
-
+	reflex compute_transition_probs when: cycle >= cycle_steady_state and cycle < cycle_steady_state + lag1_duration and save_analysisdata{
 		int total_11 <- 0;
 		int total_10 <- 0;
 		int total_01 <- 0;
@@ -378,7 +377,6 @@ global {
 			total_00 <- total_00 + self.count_00;
 		}
 
-		// evitar divisiones por cero
 		if (total_11 + total_10 > 0) {
 			P_1_given_1 <- total_11 / (total_11 + total_10);
 		}
@@ -387,8 +385,10 @@ global {
 			P_1_given_0 <- total_01 / (total_01 + total_00);
 		}
 	
-		write "P(1|1): " + P_1_given_1;
-		write "P(1|0): " + P_1_given_0;
+		//P1given1 <+ P_1_given_1;
+		//P1given0 <+ P_1_given_0;
+		save [cycle, P_1_given_1, P_1_given_0] to: "../results/transition_probabilities.csv" format: "csv" rewrite: false header: true;
+		
 	}
 	
 	list<float> vals;
@@ -397,7 +397,8 @@ global {
 	
 	//**************GLOBAL MORAN'S I *****************//
 	float moran_I;
-	reflex calculate_morans_I when: cycle >=1000 +1000{
+	int final_cycle_moran <- cycle_steady_state + 200;
+	reflex calculate_morans_I when: cycle >= cycle_steady_state and cycle < final_cycle_moran and save_analysisdata{
 		// obtain household's behavior
 		vals <- household collect (each.waste_sorted);
 		//write vals;
@@ -413,41 +414,29 @@ global {
 		
 		// Calculate Moran's I
 		moran_I <- moran(vals, weights);
-		write moran_I;
+		//list_moran_I <+ moran_I;
+		save [cycle, moran_I] to: "../results/moran_I.csv" format: "csv" rewrite: false header: true;
+		
 	}
 
-	float VAR_local_moran;
-	map histo_data;
-	list<float>generated_data;
-	reflex gen_histogram_localmoran when: cycle > 1000+10000{
-		generated_data <- [];
-		ask household{
-			generated_data <+ self.local_moran;
-		}
-		histo_data <- distribution_of(generated_data, 52, -0.26, 0.26);
-		VAR_local_moran <- variance(generated_data);
-		if cycle>1000 and cycle <=1400{
-			//write(VAR_local_moran);
-		}	
-	}
 
-	list<float> sort_frequencies;
-	map histo_frequencies;
 
-	reflex gen_histogram_frequency{
-		sort_frequencies <- [];
+
+	float  agent_frequency;
+	reflex get_sort_frequecies when: cycle = final_cycle_moran  and save_analysisdata{
 		ask household{
-			sort_frequencies <+ self.sort_frequency;
+			agent_frequency <- self.sort_frequency;
+			save agent_frequency to: "../results/histogram_data.csv" format: "csv" rewrite: false header: true;
 		}
-		histo_frequencies <- distribution_of(sort_frequencies, 20, 0, 1);
 	}
 	
+
 	int total_HH;
 	int total_LL;
 	int total_HL;
 	int total_LH;
 	
-	reflex get_LISA when: cycle > 1000+1000{
+	reflex get_LISA when: cycle > 1000 {
 		total_HH <- 0;
 		total_LL  <- 0;
 		total_HL <- 0;
@@ -468,12 +457,7 @@ global {
 					total_LH <- total_LH +1;
 				}
 			}
-		}
-		//write("Total HH: " + total_HH);
-		//write("Total LL: " + total_LL);
-		//write("Total HL: " + total_HL);
-		//write("Total LH: " + total_LH);
-		
+		}	
 	}
 
 
@@ -1125,7 +1109,7 @@ reflex get_localmoran_I {
 	//float k_habitgain 			<- gauss(0.015, 0.003);										// habit gain constant
 	//float k_habitdecay			<- gauss(0.005, 0.001);										// habit decay constant
 	
-	float k_habitgain 			<- gauss(0.80, 0.1);										// habit gain constant
+	float k_habitgain 			<- gauss(0.50, 0.1);										// habit gain constant
 	float k_habitdecay			<- gauss(0.037, 0.01);										// habit decay constant
 	
 	reflex update_habit{
@@ -1189,24 +1173,22 @@ reflex get_localmoran_I {
 			waste_sorted <-		rnd_choice([1 :: prob_sorting, 0 :: 1 - prob_sorting]);
 		}
 		
-		if cycle>1000{
+		if cycle>cycle_steady_state and cycle <=final_cycle_moran  and save_analysisdata{
 			sort_count <- sort_count + waste_sorted;
-			sort_frequency <- sort_count/(cycle-1000);
+			sort_frequency <- sort_count/(cycle-cycle_steady_state);
 		}
 		
 	}
 	
 	//--------------------------------------- temporal dependency analysis ----------------------------//
-	int coincidence <- 0; 
+	int consistency <- 0; 
 	int count_11 <- 0;
 	int count_10 <- 0;
 	int count_01 <- 0;
 	int count_00 <- 0;
 	
-	reflex track_transitions when: cycle >= cycle_steady_state-1 and cycle < cycle_steady_state + lag1_duration{
+	reflex track_transitions when: cycle >= cycle_steady_state-1 and cycle < cycle_steady_state + lag1_duration  and save_analysisdata{
 	
-		if (cycle > 0) { 
-		
 			if (waste_sorted_prev = 1 and waste_sorted = 1) {
 				count_11 <- count_11 + 1;
 			}
@@ -1219,14 +1201,13 @@ reflex get_localmoran_I {
 			else {
 				count_00 <- count_00 + 1;
 			}
-		}
 	}
 	
-	reflex get_beh_change when: cycle >= cycle_steady_state -1 and cycle < cycle_steady_state + lag1_duration{
-		try{ coincidence	<- (waste_sorted = waste_sorted_prev) ? 1:0;
+	reflex get_beh_change when: cycle >= cycle_steady_state -1 and cycle < cycle_steady_state + lag1_duration  and save_analysisdata{
+		try{ consistency	<- (waste_sorted = waste_sorted_prev) ? 1:0;
 			}
 		catch{
-			coincidence <- 0;
+			consistency <- 0;
 		}
 		waste_sorted_prev <- waste_sorted;		
 	} 
@@ -1553,7 +1534,9 @@ experiment recolecta type: gui {
 	parameter "intervencion estructural" var: str_intervention category: "Model parameters";
 	parameter "factor de intervencion estructural" var: str_interv_factor category: "Model parameters";
 	
-	parameter "Guardar datos" var: save_data  category: "Data parameters";
+	parameter "Save time series" var: save_data  category: "Data parameters";
+	parameter "analysis data collection? (Significant slowdown during data collection)" var: save_analysisdata  category: "Data parameters";
+	parameter "Steady-state cycle for data analysis data collection (reload simulation if modified)" var: cycle_steady_state category: "Data parameters";
 	
 	
 	output synchronized: true {
