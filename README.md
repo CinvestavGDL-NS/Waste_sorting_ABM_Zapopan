@@ -7,7 +7,8 @@ Installation:
 Clone this reposetory
 
 Download GAMA (compatible with GAMA 1.9.3)
-Download waste_sroting.zip and extract files
+
+Download waste_sorting.zip and extract files
 
 Run GAMA, Choose a new Workspace (this is a temporay folder used for computation)
 right click on User Models->Import->GAMA Project..
