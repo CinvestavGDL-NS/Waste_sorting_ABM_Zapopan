@@ -6,7 +6,7 @@ Installation:
 
 Clone this reposetory
 
-Download GAMA (compatible with GAMA 1.9.3)
+Download GAMA (compatible with GAMA 1.9.3) https://github.com/gama-platform/gama/releases/tag/1.9.3
 
 Download waste_sorting.zip and extract files
 
